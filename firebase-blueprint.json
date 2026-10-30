@@ -1,0 +1,730 @@
+{
+  "entities": {
+    "UserAccount": {
+      "title": "UserAccount",
+      "description": "Private user account record containing PII isolated strictly to the authenticated owner.",
+      "type": "object",
+      "properties": {
+        "uid": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "description": "Firebase Auth UID of the user."
+        },
+        "email": {
+          "type": "string",
+          "minLength": 3,
+          "maxLength": 254,
+          "description": "Verified email address of the user."
+        },
+        "displayName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100,
+          "description": "Full name or display name of the user."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp of account creation."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp of last account update."
+        }
+      },
+      "required": ["uid", "email", "displayName", "createdAt", "updatedAt"]
+    },
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "User learning preferences, daily goals, streaks, and aggregate readiness metrics.",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "description": "Owner UID matching Firebase Auth UID."
+        },
+        "displayName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100,
+          "description": "Display name shown in coaching workspace."
+        },
+        "headline": {
+          "type": "string",
+          "minLength": 0,
+          "maxLength": 160,
+          "description": "Target role or academic status."
+        },
+        "learningGoal": {
+          "type": "string",
+          "minLength": 0,
+          "maxLength": 300,
+          "description": "Primary soft skills development objective."
+        },
+        "dailyGoalMinutes": {
+          "type": "integer",
+          "description": "Target daily practice duration in minutes (5 to 180)."
+        },
+        "preferredDifficulty": {
+          "type": "string",
+          "enum": ["Beginner", "Intermediate", "Advanced"],
+          "description": "Default difficulty level for coaching and interviews."
+        },
+        "focusAreas": {
+          "type": "array",
+          "description": "Up to 6 focus soft skill areas."
+        },
+        "currentStreak": {
+          "type": "integer",
+          "description": "Current consecutive days practiced."
+        },
+        "longestStreak": {
+          "type": "integer",
+          "description": "Longest consecutive days practiced."
+        },
+        "lastActiveDate": {
+          "type": "string",
+          "minLength": 0,
+          "maxLength": 20,
+          "description": "ISO date string YYYY-MM-DD of most recent activity."
+        },
+        "totalSessions": {
+          "type": "integer",
+          "description": "Total completed or active sessions."
+        },
+        "communicationScore": {
+          "type": "integer",
+          "description": "Rolling communication score out of 100."
+        },
+        "interviewReadinessScore": {
+          "type": "integer",
+          "description": "Rolling interview readiness score out of 100."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp of profile creation."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp of last profile update."
+        }
+      },
+      "required": [
+        "userId",
+        "displayName",
+        "headline",
+        "learningGoal",
+        "dailyGoalMinutes",
+        "preferredDifficulty",
+        "focusAreas",
+        "currentStreak",
+        "longestStreak",
+        "lastActiveDate",
+        "totalSessions",
+        "communicationScore",
+        "interviewReadinessScore",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "PracticeSession": {
+      "title": "PracticeSession",
+      "description": "Session container for AI Soft Skills Coach, Workplace Scenarios, and Presentation Practice.",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "description": "Owner UID."
+        },
+        "sessionType": {
+          "type": "string",
+          "enum": ["coach", "scenario", "presentation"],
+          "description": "Practice module category."
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160,
+          "description": "Human-readable session title."
+        },
+        "scenarioId": {
+          "type": "string",
+          "minLength": 0,
+          "maxLength": 80,
+          "description": "Scenario or presentation topic identifier."
+        },
+        "difficulty": {
+          "type": "string",
+          "enum": ["Beginner", "Intermediate", "Advanced"],
+          "description": "Selected difficulty tier."
+        },
+        "status": {
+          "type": "string",
+          "enum": ["active", "completed"],
+          "description": "Lifecycle state; locked once completed."
+        },
+        "messageCount": {
+          "type": "integer",
+          "description": "Number of messages exchanged in this session."
+        },
+        "latestScore": {
+          "type": "integer",
+          "description": "Most recent evaluation score out of 100."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when session started."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp of latest turn."
+        }
+      },
+      "required": [
+        "userId",
+        "sessionType",
+        "title",
+        "scenarioId",
+        "difficulty",
+        "status",
+        "messageCount",
+        "latestScore",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "SessionMessage": {
+      "title": "SessionMessage",
+      "description": "Individual message inside a PracticeSession subcollection.",
+      "type": "object",
+      "properties": {
+        "sessionId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "description": "Parent PracticeSession ID."
+        },
+        "userId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "description": "Owner UID."
+        },
+        "role": {
+          "type": "string",
+          "enum": ["user", "assistant"],
+          "description": "Message speaker role."
+        },
+        "content": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 8000,
+          "description": "Message text content."
+        },
+        "score": {
+          "type": "integer",
+          "description": "Communication quality score (0 if unapplicable, 1-100 if evaluated)."
+        },
+        "improvedResponse": {
+          "type": "string",
+          "minLength": 0,
+          "maxLength": 4000,
+          "description": "Suggested stronger phrasing for user message."
+        },
+        "grammarNotes": {
+          "type": "array",
+          "description": "Up to 8 concise grammar or phrasing corrections."
+        },
+        "clarityNote": {
+          "type": "string",
+          "minLength": 0,
+          "maxLength": 600,
+          "description": "Written clarity and confidence evidence note."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when message was persisted."
+        }
+      },
+      "required": [
+        "sessionId",
+        "userId",
+        "role",
+        "content",
+        "score",
+        "improvedResponse",
+        "grammarNotes",
+        "clarityNote",
+        "createdAt"
+      ]
+    },
+    "InterviewSession": {
+      "title": "InterviewSession",
+      "description": "Mock interview session tracking category, difficulty, progression, and final readiness score.",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "description": "Owner UID."
+        },
+        "category": {
+          "type": "string",
+          "enum": [
+            "HR Interview",
+            "Technical Interview",
+            "Behavioral Interview",
+            "Internship Interview",
+            "Placement Interview",
+            "Leadership Interview"
+          ],
+          "description": "Interview track."
+        },
+        "difficulty": {
+          "type": "string",
+          "enum": ["Beginner", "Intermediate", "Advanced"],
+          "description": "Difficulty level."
+        },
+        "status": {
+          "type": "string",
+          "enum": ["active", "completed"],
+          "description": "Session state; locked once completed."
+        },
+        "totalQuestions": {
+          "type": "integer",
+          "description": "Number of planned interview questions (3 to 10)."
+        },
+        "currentQuestionIndex": {
+          "type": "integer",
+          "description": "Zero-based index of active question."
+        },
+        "currentQuestion": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1500,
+          "description": "Current active prompt presented by the interviewer."
+        },
+        "overallScore": {
+          "type": "integer",
+          "description": "Aggregate score out of 100 upon completion."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp of interview start."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp of latest update."
+        }
+      },
+      "required": [
+        "userId",
+        "category",
+        "difficulty",
+        "status",
+        "totalQuestions",
+        "currentQuestionIndex",
+        "currentQuestion",
+        "overallScore",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "InterviewTurn": {
+      "title": "InterviewTurn",
+      "description": "Evaluated question-and-answer turn inside an InterviewSession.",
+      "type": "object",
+      "properties": {
+        "sessionId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "description": "Parent InterviewSession ID."
+        },
+        "userId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "description": "Owner UID."
+        },
+        "questionIndex": {
+          "type": "integer",
+          "description": "Question sequence index."
+        },
+        "question": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1500,
+          "description": "Interviewer question."
+        },
+        "answer": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 8000,
+          "description": "Candidate written response."
+        },
+        "score": {
+          "type": "integer",
+          "description": "Turn score out of 100."
+        },
+        "relevanceScore": {
+          "type": "integer",
+          "description": "Relevance & supporting examples score out of 100."
+        },
+        "clarityScore": {
+          "type": "integer",
+          "description": "Clarity & conciseness score out of 100."
+        },
+        "grammarScore": {
+          "type": "integer",
+          "description": "Grammar & mechanics score out of 100."
+        },
+        "structureScore": {
+          "type": "integer",
+          "description": "STAR / logical structure score out of 100."
+        },
+        "confidenceScore": {
+          "type": "integer",
+          "description": "Written confidence indicators score out of 100."
+        },
+        "strengths": {
+          "type": "array",
+          "description": "Up to 6 observed strengths."
+        },
+        "improvements": {
+          "type": "array",
+          "description": "Up to 6 concrete improvement points."
+        },
+        "correctedAnswer": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4000,
+          "description": "Model-refined exemplar answer."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when turn was recorded."
+        }
+      },
+      "required": [
+        "sessionId",
+        "userId",
+        "questionIndex",
+        "question",
+        "answer",
+        "score",
+        "relevanceScore",
+        "clarityScore",
+        "grammarScore",
+        "structureScore",
+        "confidenceScore",
+        "strengths",
+        "improvements",
+        "correctedAnswer",
+        "createdAt"
+      ]
+    },
+    "FeedbackReport": {
+      "title": "FeedbackReport",
+      "description": "Structured 8-part evaluation and improvement report generated after practice or interviews.",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "description": "Owner UID."
+        },
+        "sourceType": {
+          "type": "string",
+          "enum": ["coach", "interview", "scenario", "presentation"],
+          "description": "Origin module of the report."
+        },
+        "sourceSessionId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "description": "Associated session ID."
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160,
+          "description": "Report title."
+        },
+        "overallScore": {
+          "type": "integer",
+          "description": "Overall rubric score out of 100."
+        },
+        "clarityScore": {
+          "type": "integer",
+          "description": "Clarity score out of 100."
+        },
+        "grammarScore": {
+          "type": "integer",
+          "description": "Grammar accuracy score out of 100."
+        },
+        "structureScore": {
+          "type": "integer",
+          "description": "Logical structure score out of 100."
+        },
+        "vocabularyScore": {
+          "type": "integer",
+          "description": "Professional vocabulary score out of 100."
+        },
+        "confidenceScore": {
+          "type": "integer",
+          "description": "Written confidence phrasing score out of 100."
+        },
+        "strengths": {
+          "type": "array",
+          "description": "Up to 8 strengths."
+        },
+        "improvements": {
+          "type": "array",
+          "description": "Up to 8 areas for improvement."
+        },
+        "grammarCorrections": {
+          "type": "array",
+          "description": "Up to 8 specific grammar corrections."
+        },
+        "vocabularySuggestions": {
+          "type": "array",
+          "description": "Up to 8 vocabulary upgrades."
+        },
+        "improvedVersion": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 6000,
+          "description": "Complete improved version of the user response or script."
+        },
+        "recommendations": {
+          "type": "array",
+          "description": "Up to 8 actionable coaching steps."
+        },
+        "suggestedNextExercise": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 400,
+          "description": "Recommended next practice exercise."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp of report creation."
+        }
+      },
+      "required": [
+        "userId",
+        "sourceType",
+        "sourceSessionId",
+        "title",
+        "overallScore",
+        "clarityScore",
+        "grammarScore",
+        "structureScore",
+        "vocabularyScore",
+        "confidenceScore",
+        "strengths",
+        "improvements",
+        "grammarCorrections",
+        "vocabularySuggestions",
+        "improvedVersion",
+        "recommendations",
+        "suggestedNextExercise",
+        "createdAt"
+      ]
+    },
+    "SkillScore": {
+      "title": "SkillScore",
+      "description": "Per-dimension soft skill mastery score for a user.",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "description": "Owner UID."
+        },
+        "skillKey": {
+          "type": "string",
+          "enum": [
+            "communication",
+            "interview",
+            "english_fluency",
+            "presentation",
+            "leadership",
+            "teamwork",
+            "conflict_management",
+            "problem_solving"
+          ],
+          "description": "Canonical soft skill identifier."
+        },
+        "skillLabel": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80,
+          "description": "Display label for skill."
+        },
+        "score": {
+          "type": "integer",
+          "description": "Current mastery score out of 100."
+        },
+        "previousScore": {
+          "type": "integer",
+          "description": "Prior score out of 100 for delta calculation."
+        },
+        "sessionsCount": {
+          "type": "integer",
+          "description": "Total evaluated exercises contributing to this skill."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp of initial score."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp of latest score update."
+        }
+      },
+      "required": [
+        "userId",
+        "skillKey",
+        "skillLabel",
+        "score",
+        "previousScore",
+        "sessionsCount",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "LearningActivity": {
+      "title": "LearningActivity",
+      "description": "Immutable activity log entry used for streaks, weekly/monthly charts, and session history.",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "description": "Owner UID."
+        },
+        "activityType": {
+          "type": "string",
+          "enum": ["coach", "interview", "scenario", "presentation"],
+          "description": "Module completed."
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160,
+          "description": "Activity summary label."
+        },
+        "score": {
+          "type": "integer",
+          "description": "Achieved score out of 100."
+        },
+        "durationMinutes": {
+          "type": "integer",
+          "description": "Estimated or measured practice minutes (1 to 240)."
+        },
+        "dateKey": {
+          "type": "string",
+          "minLength": 10,
+          "maxLength": 10,
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$",
+          "description": "Calendar day key YYYY-MM-DD."
+        },
+        "sessionId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "description": "Linked session or report ID."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when activity completed."
+        }
+      },
+      "required": [
+        "userId",
+        "activityType",
+        "title",
+        "score",
+        "durationMinutes",
+        "dateKey",
+        "sessionId",
+        "createdAt"
+      ]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "UserAccount",
+      "description": "Strictly isolated PII account records accessible only by the verified owner."
+    },
+    "/userProfiles/{userId}": {
+      "schema": "UserProfile",
+      "description": "User coaching preferences, streaks, and aggregate readiness metrics."
+    },
+    "/practiceSessions/{sessionId}": {
+      "schema": "PracticeSession",
+      "description": "Top-level practice sessions for AI coach, scenarios, and presentations."
+    },
+    "/practiceSessions/{sessionId}/messages/{messageId}": {
+      "schema": "SessionMessage",
+      "description": "Subcollection of messages belonging to a practice session."
+    },
+    "/interviewSessions/{sessionId}": {
+      "schema": "InterviewSession",
+      "description": "Top-level mock interview sessions."
+    },
+    "/interviewSessions/{sessionId}/turns/{turnId}": {
+      "schema": "InterviewTurn",
+      "description": "Subcollection of evaluated Q&A turns within an interview session."
+    },
+    "/feedbackReports/{reportId}": {
+      "schema": "FeedbackReport",
+      "description": "Structured 8-part AI coaching feedback reports."
+    },
+    "/skillScores/{scoreId}": {
+      "schema": "SkillScore",
+      "description": "Per-skill mastery tracking records."
+    },
+    "/learningActivities/{activityId}": {
+      "schema": "LearningActivity",
+      "description": "Immutable chronological log of user practice activities."
+    }
+  }
+}

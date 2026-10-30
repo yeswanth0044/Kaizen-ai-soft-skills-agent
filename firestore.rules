@@ -1,0 +1,546 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Pillar 4.1: Global Safety Net - Default Deny Catch-All
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // =========================================================================
+    // Phase 3: Hardened Global Primitives
+    // =========================================================================
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isVerifiedUser() {
+      return isSignedIn() && request.auth.token.email_verified == true;
+    }
+
+    function isOwner(userId) {
+      return isVerifiedUser() && request.auth.uid == userId;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function userAccountExists(uid) {
+      return exists(/databases/$(database)/documents/users/$(uid));
+    }
+
+    function isValidDifficulty(val) {
+      return val is string && val.size() <= 20 && (
+        val == 'Beginner' || val == 'Intermediate' || val == 'Advanced'
+      );
+    }
+
+    function isValidBoundedStringList(arr, maxItems, maxItemLen) {
+      return arr is list && arr.size() <= maxItems && (
+        arr.size() == 0 || (arr[0] is string && arr[0].size() <= maxItemLen)
+      );
+    }
+
+    // =========================================================================
+    // Entity Validation Blueprints (Anti-Update-Gap: No existing() or diff())
+    // =========================================================================
+
+    function isValidUserAccount(data) {
+      return data.keys().hasAll(['uid', 'email', 'displayName', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['uid', 'email', 'displayName', 'createdAt', 'updatedAt'])
+        && data.uid == request.auth.uid
+        && isValidId(data.uid)
+        && data.email is string && data.email.size() >= 3 && data.email.size() <= 254
+        && data.displayName is string && data.displayName.size() >= 1 && data.displayName.size() <= 100
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidUserProfile(data) {
+      return data.keys().hasAll([
+          'userId', 'displayName', 'headline', 'learningGoal', 'dailyGoalMinutes',
+          'preferredDifficulty', 'focusAreas', 'currentStreak', 'longestStreak',
+          'lastActiveDate', 'totalSessions', 'communicationScore',
+          'interviewReadinessScore', 'createdAt', 'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'userId', 'displayName', 'headline', 'learningGoal', 'dailyGoalMinutes',
+          'preferredDifficulty', 'focusAreas', 'currentStreak', 'longestStreak',
+          'lastActiveDate', 'totalSessions', 'communicationScore',
+          'interviewReadinessScore', 'createdAt', 'updatedAt'
+        ])
+        && data.userId == request.auth.uid
+        && isValidId(data.userId)
+        && data.displayName is string && data.displayName.size() >= 1 && data.displayName.size() <= 100
+        && data.headline is string && data.headline.size() <= 160
+        && data.learningGoal is string && data.learningGoal.size() <= 300
+        && data.dailyGoalMinutes is int && data.dailyGoalMinutes >= 5 && data.dailyGoalMinutes <= 180
+        && isValidDifficulty(data.preferredDifficulty)
+        && isValidBoundedStringList(data.focusAreas, 6, 60)
+        && data.currentStreak is int && data.currentStreak >= 0 && data.currentStreak <= 10000
+        && data.longestStreak is int && data.longestStreak >= 0 && data.longestStreak <= 10000
+        && data.lastActiveDate is string && data.lastActiveDate.size() <= 20
+        && data.totalSessions is int && data.totalSessions >= 0 && data.totalSessions <= 100000
+        && data.communicationScore is int && data.communicationScore >= 0 && data.communicationScore <= 100
+        && data.interviewReadinessScore is int && data.interviewReadinessScore >= 0 && data.interviewReadinessScore <= 100
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidPracticeSession(data) {
+      return data.keys().hasAll([
+          'userId', 'sessionType', 'title', 'scenarioId', 'difficulty',
+          'status', 'messageCount', 'latestScore', 'createdAt', 'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'userId', 'sessionType', 'title', 'scenarioId', 'difficulty',
+          'status', 'messageCount', 'latestScore', 'createdAt', 'updatedAt'
+        ])
+        && data.userId == request.auth.uid
+        && isValidId(data.userId)
+        && data.sessionType is string && data.sessionType.size() <= 20 && (
+          data.sessionType == 'coach' || data.sessionType == 'scenario' || data.sessionType == 'presentation'
+        )
+        && data.title is string && data.title.size() >= 1 && data.title.size() <= 160
+        && data.scenarioId is string && data.scenarioId.size() <= 80
+        && isValidDifficulty(data.difficulty)
+        && data.status is string && data.status.size() <= 20 && (
+          data.status == 'active' || data.status == 'completed'
+        )
+        && data.messageCount is int && data.messageCount >= 0 && data.messageCount <= 1000
+        && data.latestScore is int && data.latestScore >= 0 && data.latestScore <= 100
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidSessionMessage(data, parentSessionId) {
+      return data.keys().hasAll([
+          'sessionId', 'userId', 'role', 'content', 'score',
+          'improvedResponse', 'grammarNotes', 'clarityNote', 'createdAt'
+        ])
+        && data.keys().hasOnly([
+          'sessionId', 'userId', 'role', 'content', 'score',
+          'improvedResponse', 'grammarNotes', 'clarityNote', 'createdAt'
+        ])
+        && data.sessionId == parentSessionId
+        && isValidId(data.sessionId)
+        && data.userId == request.auth.uid
+        && isValidId(data.userId)
+        && data.role is string && data.role.size() <= 20 && (
+          data.role == 'user' || data.role == 'assistant'
+        )
+        && data.content is string && data.content.size() >= 1 && data.content.size() <= 8000
+        && data.score is int && data.score >= 0 && data.score <= 100
+        && data.improvedResponse is string && data.improvedResponse.size() <= 4000
+        && isValidBoundedStringList(data.grammarNotes, 8, 300)
+        && data.clarityNote is string && data.clarityNote.size() <= 600
+        && data.createdAt is timestamp;
+    }
+
+    function isValidInterviewSession(data) {
+      return data.keys().hasAll([
+          'userId', 'category', 'difficulty', 'status', 'totalQuestions',
+          'currentQuestionIndex', 'currentQuestion', 'overallScore', 'createdAt', 'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'userId', 'category', 'difficulty', 'status', 'totalQuestions',
+          'currentQuestionIndex', 'currentQuestion', 'overallScore', 'createdAt', 'updatedAt'
+        ])
+        && data.userId == request.auth.uid
+        && isValidId(data.userId)
+        && data.category is string && data.category.size() <= 40 && (
+          data.category == 'HR Interview' ||
+          data.category == 'Technical Interview' ||
+          data.category == 'Behavioral Interview' ||
+          data.category == 'Internship Interview' ||
+          data.category == 'Placement Interview' ||
+          data.category == 'Leadership Interview'
+        )
+        && isValidDifficulty(data.difficulty)
+        && data.status is string && data.status.size() <= 20 && (
+          data.status == 'active' || data.status == 'completed'
+        )
+        && data.totalQuestions is int && data.totalQuestions >= 3 && data.totalQuestions <= 10
+        && data.currentQuestionIndex is int && data.currentQuestionIndex >= 0 && data.currentQuestionIndex <= 10
+        && data.currentQuestion is string && data.currentQuestion.size() >= 1 && data.currentQuestion.size() <= 1500
+        && data.overallScore is int && data.overallScore >= 0 && data.overallScore <= 100
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidInterviewTurn(data, parentSessionId) {
+      return data.keys().hasAll([
+          'sessionId', 'userId', 'questionIndex', 'question', 'answer',
+          'score', 'relevanceScore', 'clarityScore', 'grammarScore',
+          'structureScore', 'confidenceScore', 'strengths', 'improvements',
+          'correctedAnswer', 'createdAt'
+        ])
+        && data.keys().hasOnly([
+          'sessionId', 'userId', 'questionIndex', 'question', 'answer',
+          'score', 'relevanceScore', 'clarityScore', 'grammarScore',
+          'structureScore', 'confidenceScore', 'strengths', 'improvements',
+          'correctedAnswer', 'createdAt'
+        ])
+        && data.sessionId == parentSessionId
+        && isValidId(data.sessionId)
+        && data.userId == request.auth.uid
+        && isValidId(data.userId)
+        && data.questionIndex is int && data.questionIndex >= 0 && data.questionIndex <= 10
+        && data.question is string && data.question.size() >= 1 && data.question.size() <= 1500
+        && data.answer is string && data.answer.size() >= 1 && data.answer.size() <= 8000
+        && data.score is int && data.score >= 0 && data.score <= 100
+        && data.relevanceScore is int && data.relevanceScore >= 0 && data.relevanceScore <= 100
+        && data.clarityScore is int && data.clarityScore >= 0 && data.clarityScore <= 100
+        && data.grammarScore is int && data.grammarScore >= 0 && data.grammarScore <= 100
+        && data.structureScore is int && data.structureScore >= 0 && data.structureScore <= 100
+        && data.confidenceScore is int && data.confidenceScore >= 0 && data.confidenceScore <= 100
+        && isValidBoundedStringList(data.strengths, 6, 300)
+        && isValidBoundedStringList(data.improvements, 6, 300)
+        && data.correctedAnswer is string && data.correctedAnswer.size() >= 1 && data.correctedAnswer.size() <= 4000
+        && data.createdAt is timestamp;
+    }
+
+    function isValidFeedbackReport(data) {
+      return data.keys().hasAll([
+          'userId', 'sourceType', 'sourceSessionId', 'title', 'overallScore',
+          'clarityScore', 'grammarScore', 'structureScore', 'vocabularyScore',
+          'confidenceScore', 'strengths', 'improvements', 'grammarCorrections',
+          'vocabularySuggestions', 'improvedVersion', 'recommendations',
+          'suggestedNextExercise', 'createdAt'
+        ])
+        && data.keys().hasOnly([
+          'userId', 'sourceType', 'sourceSessionId', 'title', 'overallScore',
+          'clarityScore', 'grammarScore', 'structureScore', 'vocabularyScore',
+          'confidenceScore', 'strengths', 'improvements', 'grammarCorrections',
+          'vocabularySuggestions', 'improvedVersion', 'recommendations',
+          'suggestedNextExercise', 'createdAt'
+        ])
+        && data.userId == request.auth.uid
+        && isValidId(data.userId)
+        && data.sourceType is string && data.sourceType.size() <= 20 && (
+          data.sourceType == 'coach' ||
+          data.sourceType == 'interview' ||
+          data.sourceType == 'scenario' ||
+          data.sourceType == 'presentation'
+        )
+        && isValidId(data.sourceSessionId)
+        && data.title is string && data.title.size() >= 1 && data.title.size() <= 160
+        && data.overallScore is int && data.overallScore >= 0 && data.overallScore <= 100
+        && data.clarityScore is int && data.clarityScore >= 0 && data.clarityScore <= 100
+        && data.grammarScore is int && data.grammarScore >= 0 && data.grammarScore <= 100
+        && data.structureScore is int && data.structureScore >= 0 && data.structureScore <= 100
+        && data.vocabularyScore is int && data.vocabularyScore >= 0 && data.vocabularyScore <= 100
+        && data.confidenceScore is int && data.confidenceScore >= 0 && data.confidenceScore <= 100
+        && isValidBoundedStringList(data.strengths, 8, 300)
+        && isValidBoundedStringList(data.improvements, 8, 300)
+        && isValidBoundedStringList(data.grammarCorrections, 8, 300)
+        && isValidBoundedStringList(data.vocabularySuggestions, 8, 300)
+        && data.improvedVersion is string && data.improvedVersion.size() >= 1 && data.improvedVersion.size() <= 6000
+        && isValidBoundedStringList(data.recommendations, 8, 300)
+        && data.suggestedNextExercise is string && data.suggestedNextExercise.size() >= 1 && data.suggestedNextExercise.size() <= 400
+        && data.createdAt is timestamp;
+    }
+
+    function isValidSkillScore(data) {
+      return data.keys().hasAll([
+          'userId', 'skillKey', 'skillLabel', 'score',
+          'previousScore', 'sessionsCount', 'createdAt', 'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'userId', 'skillKey', 'skillLabel', 'score',
+          'previousScore', 'sessionsCount', 'createdAt', 'updatedAt'
+        ])
+        && data.userId == request.auth.uid
+        && isValidId(data.userId)
+        && data.skillKey is string && data.skillKey.size() <= 40 && (
+          data.skillKey == 'communication' ||
+          data.skillKey == 'interview' ||
+          data.skillKey == 'english_fluency' ||
+          data.skillKey == 'presentation' ||
+          data.skillKey == 'leadership' ||
+          data.skillKey == 'teamwork' ||
+          data.skillKey == 'conflict_management' ||
+          data.skillKey == 'problem_solving'
+        )
+        && data.skillLabel is string && data.skillLabel.size() >= 1 && data.skillLabel.size() <= 80
+        && data.score is int && data.score >= 0 && data.score <= 100
+        && data.previousScore is int && data.previousScore >= 0 && data.previousScore <= 100
+        && data.sessionsCount is int && data.sessionsCount >= 0 && data.sessionsCount <= 100000
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidLearningActivity(data) {
+      return data.keys().hasAll([
+          'userId', 'activityType', 'title', 'score',
+          'durationMinutes', 'dateKey', 'sessionId', 'createdAt'
+        ])
+        && data.keys().hasOnly([
+          'userId', 'activityType', 'title', 'score',
+          'durationMinutes', 'dateKey', 'sessionId', 'createdAt'
+        ])
+        && data.userId == request.auth.uid
+        && isValidId(data.userId)
+        && data.activityType is string && data.activityType.size() <= 20 && (
+          data.activityType == 'coach' ||
+          data.activityType == 'interview' ||
+          data.activityType == 'scenario' ||
+          data.activityType == 'presentation'
+        )
+        && data.title is string && data.title.size() >= 1 && data.title.size() <= 160
+        && data.score is int && data.score >= 0 && data.score <= 100
+        && data.durationMinutes is int && data.durationMinutes >= 1 && data.durationMinutes <= 240
+        && data.dateKey is string && data.dateKey.size() == 10 && data.dateKey.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$')
+        && isValidId(data.sessionId)
+        && data.createdAt is timestamp;
+    }
+
+    // =========================================================================
+    // Collection Match Blocks (Exhaustive Coverage of Blueprint)
+    // =========================================================================
+
+    // 1. /users/{userId} - PII Strictly Isolated (No list access)
+    match /users/{userId} {
+      allow get: if isOwner(userId) && isValidId(userId);
+      allow list: if false;
+      allow create: if isOwner(userId)
+        && isValidId(userId)
+        && isValidUserAccount(incoming())
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time;
+      allow update: if isOwner(userId)
+        && isValidId(userId)
+        && isValidUserAccount(incoming())
+        && incoming().uid == existing().uid
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && incoming().diff(existing()).affectedKeys().hasOnly(['email', 'displayName', 'updatedAt']);
+      allow delete: if false;
+    }
+
+    // 2. /userProfiles/{userId} - Owner Coaching Profile & Aggregate Stats
+    match /userProfiles/{userId} {
+      allow get: if isOwner(userId) && isValidId(userId);
+      allow list: if false;
+      allow create: if isOwner(userId)
+        && isValidId(userId)
+        && isValidUserProfile(incoming())
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time
+        && userAccountExists(userId);
+      allow update: if isOwner(userId)
+        && isValidId(userId)
+        && isValidUserProfile(incoming())
+        && incoming().userId == existing().userId
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && (
+          // Action 1: Update Preferences & Profile Settings
+          incoming().diff(existing()).affectedKeys().hasOnly([
+            'displayName', 'headline', 'learningGoal', 'dailyGoalMinutes',
+            'preferredDifficulty', 'focusAreas', 'updatedAt'
+          ]) ||
+          // Action 2: Record Session Progress & Streak Metrics
+          incoming().diff(existing()).affectedKeys().hasOnly([
+            'currentStreak', 'longestStreak', 'lastActiveDate', 'totalSessions',
+            'communicationScore', 'interviewReadinessScore', 'updatedAt'
+          ])
+        )
+        && userAccountExists(userId);
+      allow delete: if false;
+    }
+
+    // 3. /practiceSessions/{sessionId} - Coach, Scenario, and Presentation Sessions
+    match /practiceSessions/{sessionId} {
+      allow get: if isVerifiedUser() && isValidId(sessionId) && resource != null && existing().userId == request.auth.uid;
+      allow list: if isVerifiedUser() && existing().userId == request.auth.uid;
+      allow create: if isVerifiedUser()
+        && isValidId(sessionId)
+        && isValidPracticeSession(incoming())
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time
+        && userAccountExists(request.auth.uid);
+      allow update: if isVerifiedUser()
+        && isValidId(sessionId)
+        && isValidPracticeSession(incoming())
+        && existing().userId == request.auth.uid
+        && existing().status != 'completed'
+        && incoming().userId == existing().userId
+        && incoming().sessionType == existing().sessionType
+        && incoming().scenarioId == existing().scenarioId
+        && incoming().difficulty == existing().difficulty
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && (
+          // Action 1: Progress Turn Update
+          (
+            incoming().status == 'active' &&
+            incoming().diff(existing()).affectedKeys().hasOnly([
+              'title', 'messageCount', 'latestScore', 'updatedAt'
+            ])
+          ) ||
+          // Action 2: Complete Session (Terminal Transition)
+          (
+            incoming().status == 'completed' &&
+            incoming().diff(existing()).affectedKeys().hasOnly([
+              'status', 'messageCount', 'latestScore', 'updatedAt'
+            ])
+          )
+        );
+      allow delete: if isVerifiedUser() && isValidId(sessionId) && resource != null && existing().userId == request.auth.uid;
+
+      // 4. Subcollection: /practiceSessions/{sessionId}/messages/{messageId}
+      match /messages/{messageId} {
+        allow get: if isVerifiedUser()
+          && isValidId(sessionId)
+          && isValidId(messageId)
+          && resource != null
+          && existing().userId == request.auth.uid
+          && get(/databases/$(database)/documents/practiceSessions/$(sessionId)).data.userId == request.auth.uid;
+        allow list: if isVerifiedUser()
+          && isValidId(sessionId)
+          && existing().userId == request.auth.uid;
+        allow create: if isVerifiedUser()
+          && isValidId(sessionId)
+          && isValidId(messageId)
+          && isValidSessionMessage(incoming(), sessionId)
+          && incoming().createdAt == request.time
+          && get(/databases/$(database)/documents/practiceSessions/$(sessionId)).data.userId == request.auth.uid
+          && get(/databases/$(database)/documents/practiceSessions/$(sessionId)).data.status != 'completed';
+        allow update: if false;
+        allow delete: if isVerifiedUser()
+          && isValidId(sessionId)
+          && isValidId(messageId)
+          && resource != null
+          && existing().userId == request.auth.uid
+          && get(/databases/$(database)/documents/practiceSessions/$(sessionId)).data.userId == request.auth.uid;
+      }
+    }
+
+    // 5. /interviewSessions/{sessionId} - Mock Interview Sessions
+    match /interviewSessions/{sessionId} {
+      allow get: if isVerifiedUser() && isValidId(sessionId) && resource != null && existing().userId == request.auth.uid;
+      allow list: if isVerifiedUser() && existing().userId == request.auth.uid;
+      allow create: if isVerifiedUser()
+        && isValidId(sessionId)
+        && isValidInterviewSession(incoming())
+        && incoming().status == 'active'
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time
+        && userAccountExists(request.auth.uid);
+      allow update: if isVerifiedUser()
+        && isValidId(sessionId)
+        && isValidInterviewSession(incoming())
+        && existing().userId == request.auth.uid
+        && existing().status != 'completed'
+        && incoming().userId == existing().userId
+        && incoming().category == existing().category
+        && incoming().difficulty == existing().difficulty
+        && incoming().totalQuestions == existing().totalQuestions
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && (
+          // Action 1: Advance Question Turn
+          (
+            incoming().status == 'active' &&
+            incoming().diff(existing()).affectedKeys().hasOnly([
+              'currentQuestionIndex', 'currentQuestion', 'overallScore', 'updatedAt'
+            ])
+          ) ||
+          // Action 2: Finalize Interview (Terminal Transition)
+          (
+            incoming().status == 'completed' &&
+            incoming().diff(existing()).affectedKeys().hasOnly([
+              'status', 'currentQuestionIndex', 'overallScore', 'updatedAt'
+            ])
+          )
+        );
+      allow delete: if false;
+
+      // 6. Subcollection: /interviewSessions/{sessionId}/turns/{turnId}
+      match /turns/{turnId} {
+        allow get: if isVerifiedUser()
+          && isValidId(sessionId)
+          && isValidId(turnId)
+          && resource != null
+          && existing().userId == request.auth.uid
+          && get(/databases/$(database)/documents/interviewSessions/$(sessionId)).data.userId == request.auth.uid;
+        allow list: if isVerifiedUser()
+          && isValidId(sessionId)
+          && existing().userId == request.auth.uid;
+        allow create: if isVerifiedUser()
+          && isValidId(sessionId)
+          && isValidId(turnId)
+          && isValidInterviewTurn(incoming(), sessionId)
+          && incoming().createdAt == request.time
+          && get(/databases/$(database)/documents/interviewSessions/$(sessionId)).data.userId == request.auth.uid
+          && get(/databases/$(database)/documents/interviewSessions/$(sessionId)).data.status != 'completed';
+        allow update, delete: if false;
+      }
+    }
+
+    // 7. /feedbackReports/{reportId} - Immutable Structured Feedback Reports
+    match /feedbackReports/{reportId} {
+      allow get: if isVerifiedUser() && isValidId(reportId) && resource != null && existing().userId == request.auth.uid;
+      allow list: if isVerifiedUser() && existing().userId == request.auth.uid;
+      allow create: if isVerifiedUser()
+        && isValidId(reportId)
+        && isValidFeedbackReport(incoming())
+        && incoming().createdAt == request.time
+        && userAccountExists(request.auth.uid);
+      allow update, delete: if false;
+    }
+
+    // 8. /skillScores/{scoreId} - Per-Skill Mastery Scores
+    match /skillScores/{scoreId} {
+      allow get: if isVerifiedUser() && isValidId(scoreId) && (
+        (resource == null && scoreId.matches('^' + request.auth.uid + '_[a-z_]+$')) ||
+        (resource != null && existing().userId == request.auth.uid)
+      );
+      allow list: if isVerifiedUser() && existing().userId == request.auth.uid;
+      allow create: if isVerifiedUser()
+        && isValidId(scoreId)
+        && isValidSkillScore(incoming())
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time
+        && userAccountExists(request.auth.uid);
+      allow update: if isVerifiedUser()
+        && isValidId(scoreId)
+        && isValidSkillScore(incoming())
+        && existing().userId == request.auth.uid
+        && incoming().userId == existing().userId
+        && incoming().skillKey == existing().skillKey
+        && incoming().skillLabel == existing().skillLabel
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && (
+          // Action: Update Skill Mastery Score
+          incoming().diff(existing()).affectedKeys().hasOnly([
+            'score', 'previousScore', 'sessionsCount', 'updatedAt'
+          ])
+        );
+      allow delete: if false;
+    }
+
+    // 9. /learningActivities/{activityId} - Immutable Chronological Activity Log
+    match /learningActivities/{activityId} {
+      allow get: if isVerifiedUser() && isValidId(activityId) && resource != null && existing().userId == request.auth.uid;
+      allow list: if isVerifiedUser() && existing().userId == request.auth.uid;
+      allow create: if isVerifiedUser()
+        && isValidId(activityId)
+        && isValidLearningActivity(incoming())
+        && incoming().createdAt == request.time
+        && userAccountExists(request.auth.uid);
+      allow update, delete: if false;
+    }
+  }
+}

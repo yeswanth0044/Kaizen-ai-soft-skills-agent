@@ -1,0 +1,6 @@
+{
+  "name": "KAIZEN – AI Soft Skills Agent",
+  "description": "An AI-powered soft skills coach with interactive communication coaching, mock interviews, workplace scenarios, presentation practice, structured feedback, and continuous performance tracking.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

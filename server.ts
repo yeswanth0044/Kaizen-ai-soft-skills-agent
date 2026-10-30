@@ -250,7 +250,7 @@ async function startServer() {
   }
 
   app.listen(PORT, '0.0.0.0', () => {
-    console.log(`KAIZEN full-stack server listening on http://0.0.0.0:${PORT}`);
+    console.log(`KAIZEN full-stack server listening on http://localhost:${PORT}`);
   });
 }
 
